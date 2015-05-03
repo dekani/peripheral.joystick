@@ -190,6 +190,8 @@ void CJoystick::Calibrate(unsigned int axisIndex, JOYSTICK_STATE_AXIS value)
 
   // Recursive mean
   c.avg = (c.numSamples - 1) * c.avg / c.numSamples + value / c.numSamples;
+
+  dsyslog("Axis %u: samples: %u, avg: %f", axisIndex, c.numSamples, c.avg);
 }
 
 float CJoystick::GetCalibratedValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS value) const
