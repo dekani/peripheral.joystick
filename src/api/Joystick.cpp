@@ -184,6 +184,7 @@ void CJoystick::UpdateTimers(void)
 
 void CJoystick::Calibrate(unsigned int axisIndex, JOYSTICK_STATE_AXIS value)
 {
+  /* TODO
   AxisCalibration& c = m_calibration[axisIndex];
 
   c.numSamples++;
@@ -192,6 +193,7 @@ void CJoystick::Calibrate(unsigned int axisIndex, JOYSTICK_STATE_AXIS value)
   c.avg = (c.numSamples - 1) * c.avg / c.numSamples + value / c.numSamples;
 
   dsyslog("Axis %u: samples: %u, avg: %f", axisIndex, c.numSamples, c.avg);
+  */
 }
 
 float CJoystick::GetCalibratedValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS value) const
@@ -201,16 +203,18 @@ float CJoystick::GetCalibratedValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS 
   float center = 0.0f;
   float scale = 1.0f;
 
-  if (c.avg < -0.5f)
+  if (axisIndex == 4 || axisIndex == 5)
   {
     center = -1.0f;
     scale = 0.5f;
   }
+  /*
   else if (c.avg > 0.5f)
   {
     center = 1.0f;
     scale = -0.5f;
   }
+  */
 
   return scale * (value - center);
 }
