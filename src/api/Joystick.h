@@ -89,10 +89,15 @@ namespace JOYSTICK
 
     void UpdateTimers(void);
 
+    bool IsCalibrated(void) const { return m_bCalibrated; }
+    void Calibrate(unsigned int axisIndex, JOYSTICK_STATE_AXIS value);
+    float GetCalibratedValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS value) const;
+
     /*!
      * Normalize the axis to the closed interval [-1.0, 1.0].
      */
     static float NormalizeAxis(long value, long maxAxisAmount);
+    static float ScaleDeadzone(float value);
 
     struct JoystickState
     {
@@ -101,9 +106,17 @@ namespace JOYSTICK
       std::vector<JOYSTICK_STATE_AXIS>   axes;
     };
 
+    struct AxisCalibration
+    {
+      float        avg;
+      unsigned int numSamples;
+    };
+
     CJoystickInterface* const m_api;
     JoystickState             m_state;
     JoystickState             m_stateBuffer;
+    bool                      m_bCalibrated;
+    std::vector<AxisCalibration> m_calibration;
     int64_t                   m_discoverTimeMs;
     int64_t                   m_firstEventTimeMs;
     int64_t                   m_lastEventTimeMs;

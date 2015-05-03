@@ -27,10 +27,12 @@
 
 using namespace JOYSTICK;
 
-#define ANALOG_EPSILON  0.0001f
+#define ANALOG_EPSILON       0.0001f
+#define CALIBRATION_TIME_MS  1000
 
 CJoystick::CJoystick(CJoystickInterface* api)
  : m_api(api),
+   m_bCalibrated(false),
    m_discoverTimeMs(PLATFORM::GetTimeMs()),
    m_firstEventTimeMs(-1),
    m_lastEventTimeMs(-1)
@@ -69,6 +71,8 @@ bool CJoystick::Initialize(void)
   m_stateBuffer.buttons.assign(ButtonCount(), JOYSTICK_STATE_BUTTON_UNPRESSED);
   m_stateBuffer.hats.assign(HatCount(), JOYSTICK_STATE_HAT_UNPRESSED);
   m_stateBuffer.axes.assign(AxisCount(), 0.0f);
+
+  m_calibration.resize(AxisCount());
 
   return true;
 }
@@ -155,14 +159,10 @@ void CJoystick::SetAxisValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS axisVal
 {
   if (axisIndex < AxisCount())
   {
-    const float deadzone = CSettings::Get().Deadzone();
-
-    if (axisValue > deadzone)
-      m_stateBuffer.axes[axisIndex] = (float)(axisValue - deadzone) / (float)(1.0f - deadzone);
-    else if (axisValue < -deadzone)
-      m_stateBuffer.axes[axisIndex] = (float)(axisValue + deadzone) / (float)(1.0f - deadzone);
+    if (!IsCalibrated())
+      Calibrate(axisIndex, axisValue);
     else
-      m_stateBuffer.axes[axisIndex] = 0.0f;
+      m_stateBuffer.axes[axisIndex] = ScaleDeadzone(GetCalibratedValue(axisIndex, axisValue));
   }
 }
 
@@ -175,10 +175,57 @@ void CJoystick::UpdateTimers(void)
 {
   if (m_firstEventTimeMs < 0)
     m_firstEventTimeMs = PLATFORM::GetTimeMs();
+
   m_lastEventTimeMs = PLATFORM::GetTimeMs();
+
+  if (m_lastEventTimeMs - m_firstEventTimeMs >= CALIBRATION_TIME_MS)
+    m_bCalibrated = true;
+}
+
+void CJoystick::Calibrate(unsigned int axisIndex, JOYSTICK_STATE_AXIS value)
+{
+  AxisCalibration& c = m_calibration[axisIndex];
+
+  c.numSamples++;
+
+  // Recursive mean
+  c.avg = (c.numSamples - 1) * c.avg / c.numSamples + value / c.numSamples;
+}
+
+float CJoystick::GetCalibratedValue(unsigned int axisIndex, JOYSTICK_STATE_AXIS value) const
+{
+  const AxisCalibration& c = m_calibration[axisIndex];
+
+  float center = 0.0f;
+  float scale = 1.0f;
+
+  if (c.avg < -0.5f)
+  {
+    center = -1.0f;
+    scale = 0.5f;
+  }
+  else if (c.avg > 0.5f)
+  {
+    center = 1.0f;
+    scale = -0.5f;
+  }
+
+  return scale * (value - center);
 }
 
 float CJoystick::NormalizeAxis(long value, long maxAxisAmount)
 {
   return 1.0f * CONSTRAIN(-maxAxisAmount, value, maxAxisAmount) / maxAxisAmount;
+}
+
+float CJoystick::ScaleDeadzone(float value)
+{
+  const float deadzone = CSettings::Get().Deadzone();
+
+  if (value > deadzone)
+    return (float)(value - deadzone) / (float)(1.0f - deadzone);
+  else if (value < -deadzone)
+    return (float)(value + deadzone) / (float)(1.0f - deadzone);
+  else
+    return 0.0f;
 }
